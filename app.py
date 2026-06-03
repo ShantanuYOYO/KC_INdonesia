@@ -1,4 +1,3 @@
-
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -622,6 +621,9 @@ if uploaded_file is not None:
         with st.spinner('🔍 Loading and processing data...'):
             merged_df, sheet_a_unique, sheet_b_raw = load_and_process_data(uploaded_file)
 
+        # ── Variable for Return % (change this value as needed) ──────
+        return_pct = 19.22
+
         st.success(f"✅ Data loaded successfully! {len(merged_df):,} records processed")
         st.markdown("<hr>", unsafe_allow_html=True)
 
@@ -756,13 +758,14 @@ if uploaded_file is not None:
             f_disposed = filtered_sheet_a['DISPOSED'].sum()
             f_spct     = (f_sold / f_init * 100) if f_init > 0 else 0
 
-            col1, col2, col3, col4, col5 = st.columns(5)
+            col1, col2, col3, col4, col5, col6 = st.columns(6)
             kpis = [
-                (col1, "📦", "Initial Qty",    f"{f_init:,.0f}"),
-                (col2, "💰", "Total Qty Sold", f"{f_sold:,.0f}"),
-                (col3, "⚖️", "Balance Qty",   f"{f_bal:,.0f}"),
-                (col4, "🗑️", "Disposed Qty",  f"{f_disposed:,.0f}"),
-                (col5, "📈", "Sales %",        f"{f_spct:.1f}%"),
+                (col1, "📦", "Initial Qty",            f"{f_init:,.0f}"),
+                (col2, "💰", "Total Qty Sold",         f"{f_sold:,.0f}"),
+                (col3, "⚖️",  "Balance Qty",           f"{f_bal:,.0f}"),
+                (col4, "🗑️", "Disposed Qty",          f"{f_disposed:,.0f}"),
+                (col5, "📈", "Sales %",                f"{f_spct:.1f}%"),
+                (col6, "🔄", "Return %",               f"{return_pct:.1f}%"),
             ]
             for col, icon, label, value in kpis:
                 with col:
