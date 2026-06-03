@@ -622,7 +622,7 @@ if uploaded_file is not None:
             merged_df, sheet_a_unique, sheet_b_raw = load_and_process_data(uploaded_file)
 
         # ── Variable for Return % (change this value as needed) ──────
-        return_pct = 19.22
+        return_pct = 12.47
 
         st.success(f"✅ Data loaded successfully! {len(merged_df):,} records processed")
         st.markdown("<hr>", unsafe_allow_html=True)
@@ -765,7 +765,7 @@ if uploaded_file is not None:
                 (col3, "⚖️",  "Balance Qty",           f"{f_bal:,.0f}"),
                 (col4, "🗑️", "Disposed Qty",          f"{f_disposed:,.0f}"),
                 (col5, "📈", "Sales %",                f"{f_spct:.1f}%"),
-                (col6, "🔄", "Return %",               f"{return_pct:.1f}%"),
+                (col6, "🔄", "Return % Jan-Apr 2026",  f"{return_pct:.1f}%"),
             ]
             for col, icon, label, value in kpis:
                 with col:
@@ -871,7 +871,7 @@ if uploaded_file is not None:
                         cornerradius=6,
                     ),
                 ))
-                fig_mp.update_layout(title="Orders by Marketplace")
+                fig_mp.update_layout(title="Sales by Marketplace till Apr 2026")
                 fig_mp = _dark_layout(
                     fig_mp, "Marketplace", "Total Orders",
                     extra_xaxis={'categoryorder': 'array',
@@ -918,7 +918,7 @@ if uploaded_file is not None:
                         cornerradius=5,
                     ),
                 ))
-                fig_mo.update_layout(title="Orders by Month-Year")
+                fig_mo.update_layout(title="Sales by Month-Year till Apr 2026")
                 fig_mo = _dark_layout(
                     fig_mo, "Month-Year", "Total Orders",
                     extra_xaxis={
