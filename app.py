@@ -465,7 +465,7 @@ def _dark_layout(fig, xaxis_title, yaxis_title, extra_xaxis=None, height=500):
     return fig
 
 
-# ── Gold-theme HTML table renderer (same as India/Asia/Dubai) ─────────────────
+# ── Gold-theme HTML table renderer ────────────────────────────────────────────
 def render_gold_table(df, title, height=420):
     """Render a DataFrame as a gold-themed HTML table — first column white, rest gold."""
     headers = "".join(f"<th>{col}</th>" for col in df.columns)
@@ -547,7 +547,13 @@ def load_and_process_data(uploaded_file):
             'DISPOSED':    pd.to_numeric(sheet_a[disposed_col], errors='coerce').fillna(0),
         })
 
-        sheet_a_unique = sheet_a_clean.drop_duplicates(subset=['SKU'], keep='first')
+        # ✅ Aggregate by SKU – sum quantities, keep first categorical
+        agg_dict = {
+            'COLOR': 'first', 'BRAND': 'first', 'SEASON': 'first',
+            'CATEGORY': 'first', 'SUBCATEGORY': 'first',
+            'TOTAL_SALES': 'sum', 'INITIAL_QTY': 'sum', 'BALANCE': 'sum', 'DISPOSED': 'sum'
+        }
+        sheet_a_unique = sheet_a_clean.groupby('SKU', as_index=False).agg(agg_dict)
 
         # ── Sheet B columns ────────────────────────────────────────────────────
         sku_col_b      = find_column(sheet_b, ['SKU', 'Sku'])
@@ -583,7 +589,6 @@ def load_and_process_data(uploaded_file):
         sheet_b_raw['YEAR_NUM']   = sheet_b_raw['ORDER_DATE'].dt.year
         sheet_b_raw['MONTH_YEAR'] = sheet_b_raw['ORDER_DATE'].dt.strftime('%b-%y')
 
-        # No merged_df – return clean stock and raw orders
         return sheet_a_unique, sheet_b_raw
 
     except Exception as e:
@@ -652,51 +657,55 @@ if uploaded_file is not None:
             selected_statuses      = st.multiselect("Status",       ['All'] + statuses,      default='All')
             selected_month_years   = st.multiselect("Month-Year",   ['All'] + month_years,   default='All')
 
-            # ── Cross‑filter logic: intersection of A and B SKUs ──────────────
-            # 1. SKUs passing all Sheet A filters
+            # ── Filter logic ───────────────────────────────────────────────────
             filtered_a = sheet_a_unique.copy()
-            if 'All' not in selected_brands        and selected_brands:
+            if 'All' not in selected_brands and selected_brands:
                 filtered_a = filtered_a[filtered_a['BRAND'].isin(selected_brands)]
-            if 'All' not in selected_seasons       and selected_seasons:
+            if 'All' not in selected_seasons and selected_seasons:
                 filtered_a = filtered_a[filtered_a['SEASON'].isin(selected_seasons)]
-            if 'All' not in selected_categories    and selected_categories:
+            if 'All' not in selected_categories and selected_categories:
                 filtered_a = filtered_a[filtered_a['CATEGORY'].isin(selected_categories)]
             if 'All' not in selected_subcategories and selected_subcategories:
                 filtered_a = filtered_a[filtered_a['SUBCATEGORY'].isin(selected_subcategories)]
-            if 'All' not in selected_colors        and selected_colors:
+            if 'All' not in selected_colors and selected_colors:
                 filtered_a = filtered_a[filtered_a['COLOR'].isin(selected_colors)]
-            if 'All' not in selected_skus          and selected_skus:
+            if 'All' not in selected_skus and selected_skus:
                 filtered_a = filtered_a[filtered_a['SKU'].isin(selected_skus)]
 
             valid_a_skus = set(filtered_a['SKU'].unique())
 
-            # 2. SKUs that appear in Sheet B after Marketplace, Status, Month‑Year filters
-            temp_b = sheet_b_raw[sheet_b_raw['SKU'].isin(valid_a_skus)].copy()
-            if 'All' not in selected_marketplaces and selected_marketplaces:
-                temp_b = temp_b[temp_b['MARKETPLACE'].isin(selected_marketplaces)]
-            if 'All' not in selected_statuses     and selected_statuses:
-                temp_b = temp_b[temp_b['STATUS'].isin(selected_statuses)]
-            if 'All' not in selected_month_years  and selected_month_years:
-                temp_b = temp_b[temp_b['MONTH_YEAR'].isin(selected_month_years)]
+            # B filter active?
+            b_filter_active = (
+                ('All' not in selected_marketplaces and selected_marketplaces) or
+                ('All' not in selected_statuses and selected_statuses) or
+                ('All' not in selected_month_years and selected_month_years)
+            )
 
-            valid_b_skus = set(temp_b['SKU'].unique())
+            if b_filter_active:
+                temp_b = sheet_b_raw[sheet_b_raw['SKU'].isin(valid_a_skus)].copy()
+                if 'All' not in selected_marketplaces and selected_marketplaces:
+                    temp_b = temp_b[temp_b['MARKETPLACE'].isin(selected_marketplaces)]
+                if 'All' not in selected_statuses and selected_statuses:
+                    temp_b = temp_b[temp_b['STATUS'].isin(selected_statuses)]
+                if 'All' not in selected_month_years and selected_month_years:
+                    temp_b = temp_b[temp_b['MONTH_YEAR'].isin(selected_month_years)]
+                valid_b_skus = set(temp_b['SKU'].unique())
+                valid_skus = valid_a_skus.intersection(valid_b_skus)
+            else:
+                valid_skus = valid_a_skus.copy()
 
-            # Intersection = visible SKUs
-            valid_skus = valid_a_skus.intersection(valid_b_skus)
-
-            # 3. Final filtered datasets for KPIs, tables, charts
+            # Build final datasets
             filtered_sheet_a = sheet_a_unique[sheet_a_unique['SKU'].isin(valid_skus)].copy()
 
-            # Final orders – all B filters applied (Marketplace, Status, Month‑Year)
             filtered_b_final = sheet_b_raw[sheet_b_raw['SKU'].isin(valid_skus)].copy()
             if 'All' not in selected_marketplaces and selected_marketplaces:
                 filtered_b_final = filtered_b_final[filtered_b_final['MARKETPLACE'].isin(selected_marketplaces)]
-            if 'All' not in selected_statuses     and selected_statuses:
+            if 'All' not in selected_statuses and selected_statuses:
                 filtered_b_final = filtered_b_final[filtered_b_final['STATUS'].isin(selected_statuses)]
-            if 'All' not in selected_month_years  and selected_month_years:
+            if 'All' not in selected_month_years and selected_month_years:
                 filtered_b_final = filtered_b_final[filtered_b_final['MONTH_YEAR'].isin(selected_month_years)]
 
-            # ── Sidebar DATASET pills (cross‑filter aware) ────────────────────
+            # Sidebar DATASET pills
             st.markdown("---")
             st.markdown("### DATASET")
             st.markdown(f"""
@@ -719,15 +728,18 @@ if uploaded_file is not None:
             st.warning("⚠️ No SKUs match the selected filters. Please adjust your selections.")
             st.stop()
 
-        # ── KPIs (stock from A, orders from B) ─────────────────────────────────
+        # ── KPIs (use Sheet A's TOTAL_SALES when no B filter) ─────────────────
         st.markdown('<div class="section-heading">◆ Key Performance Indicators</div>', unsafe_allow_html=True)
 
         f_init     = filtered_sheet_a['INITIAL_QTY'].sum()
         f_bal      = filtered_sheet_a['BALANCE'].sum()
         f_disposed = filtered_sheet_a['DISPOSED'].sum()
-        total_qty_sold = filtered_b_final['TOTAL_ORDER'].sum()   # from orders
 
-        # Sales % = (Total Qty Sold / Initial Qty) * 100
+        if b_filter_active:
+            total_qty_sold = filtered_b_final['TOTAL_ORDER'].sum()
+        else:
+            total_qty_sold = filtered_sheet_a['TOTAL_SALES'].sum()
+
         f_spct = (total_qty_sold / f_init * 100) if f_init > 0 else 0
 
         col1, col2, col3, col4, col5, col6 = st.columns(6)
@@ -750,21 +762,22 @@ if uploaded_file is not None:
 
         st.markdown("<hr>", unsafe_allow_html=True)
 
-        # ── Distribution tables (cross‑filter left join on SKU) ──────────────
+        # ── Distribution tables ──────────────────────────────────────────────
         st.markdown('<div class="section-heading">◆ Sales Distribution Tables</div>', unsafe_allow_html=True)
 
-        # Aggregate orders per SKU
-        orders_agg = filtered_b_final.groupby('SKU')['TOTAL_ORDER'].sum().reset_index()
-        orders_agg.rename(columns={'TOTAL_ORDER': 'TOTAL_ORDER_SUM'}, inplace=True)
-
-        # Merge stock (A) with orders (B) – inner join guarantees only valid SKUs
-        merged_for_tables = pd.merge(
-            filtered_sheet_a[['SKU', 'BRAND', 'SEASON', 'CATEGORY', 'SUBCATEGORY', 'COLOR',
-                              'INITIAL_QTY', 'BALANCE', 'DISPOSED']],
-            orders_agg,
-            on='SKU',
-            how='inner'
-        )
+        if b_filter_active:
+            orders_agg = filtered_b_final.groupby('SKU')['TOTAL_ORDER'].sum().reset_index()
+            orders_agg.rename(columns={'TOTAL_ORDER': 'TOTAL_ORDER_SUM'}, inplace=True)
+            merged_for_tables = pd.merge(
+                filtered_sheet_a[['SKU', 'BRAND', 'SEASON', 'CATEGORY', 'SUBCATEGORY', 'COLOR',
+                                  'INITIAL_QTY', 'BALANCE', 'DISPOSED']],
+                orders_agg, on='SKU', how='inner'
+            )
+        else:
+            merged_for_tables = filtered_sheet_a[['SKU', 'BRAND', 'SEASON', 'CATEGORY',
+                                                   'SUBCATEGORY', 'COLOR', 'INITIAL_QTY',
+                                                   'BALANCE', 'DISPOSED']].copy()
+            merged_for_tables['TOTAL_ORDER_SUM'] = filtered_sheet_a['TOTAL_SALES']
 
         def analyze_group_crossfilter(group_col, display_name):
             if group_col not in merged_for_tables.columns:
@@ -790,7 +803,6 @@ if uploaded_file is not None:
                 sort_map[sort_column], ascending=(sort_order == 'Ascending')
             )
 
-            # Build display‑ready DataFrame
             display = pd.DataFrame()
             display[display_name]   = grouped[group_col].astype(str)
             display['Initial Qty']  = grouped['INITIAL_QTY'].apply(lambda v: f"{int(v):,}")
@@ -825,7 +837,7 @@ if uploaded_file is not None:
 
         st.markdown("<hr>", unsafe_allow_html=True)
 
-        # ── Visual Analytics (charts from filtered_b_final) ────────────────────
+        # ── Visual Analytics (always from orders) ────────────────────────────
         st.markdown('<div class="section-heading">◆ Visual Analytics</div>', unsafe_allow_html=True)
 
         # CHART 1: Marketplace
